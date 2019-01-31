@@ -22,6 +22,13 @@ sudo /usr/sbin/openvpn --config ifarrer1.conf
 
 # VMX Setup
 # Check that SR-IOV is enabled in the BIOS (disabled by default)
+# setting KSM_ENABLED=0 in /etc/default/qemu-kvm
+# set options kvm_intel nested=1 enable_apicv=0 in /etc/modprobe.d/qemu-system-x86.conf
+# 
+
+apt-get install bridge-utils qemu-kvm libvirt-bin python python-netifaces vnc4server libyaml-dev python-yaml numactl libparted0-dev libpciaccess-dev libnuma-devlibyajl-devlibxml2-devlibglib2.0-devlibnl-devpython-pip python-dev libxml2-dev libxslt-dev
+
+
 sudo apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils
 apt-get install build-essential
 apt-get install libelf-dev
