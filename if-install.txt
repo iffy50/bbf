@@ -26,8 +26,8 @@ sudo /usr/sbin/openvpn --config ifarrer1.conf
 # set options kvm_intel nested=1 enable_apicv=0 in /etc/modprobe.d/qemu-system-x86.conf
 # 
 
-apt-get install bridge-utils qemu-kvm libvirt-bin python python-netifaces vnc4server libyaml-dev python-yaml numactl libparted0-dev libpciaccess-dev libnuma-devlibyajl-devlibxml2-devlibglib2.0-devlibnl-devpython-pip python-dev libxml2-dev libxslt-dev
-
+apt-get install bridge-utils qemu-kvm libvirt-bin python python-netifaces vnc4server libyaml-dev python-yaml numactl libparted0-dev libpciaccess-dev libnuma-dev libyajl-dev libxml2-dev libglib2.0-dev libnl-dev python-pip python-dev libxml2-dev libxslt-dev
+apt-get install libnl-3-dev
 
 sudo apt install qemu-kvm libvirt-clients libvirt-daemon-system bridge-utils
 apt-get install build-essential
@@ -37,7 +37,10 @@ lspci | grep -i ethernet
 04:00.0 Ethernet controller: Intel Corporation Ethernet Connection X552 10 GbE SFP+
 04:00.1 Ethernet controller: Intel Corporation Ethernet Connection X552 10 GbE SFP+
 
-echo 1 > /sys/class/net/en7/device/sriov_numvfs
+echo 1 > /sys/class/net/eno7/device/sriov_numvfs
+echo 1 > /sys/class/net/enp7s0f0/device/sriov_numvfs
+
+
 wget https://downloadmirror.intel.com/14687/eng/ixgbe-5.5.3.tar.gz
 tar -zxvf ixgbe-5.5.3.tar.gz
 cd ixgbe-5.5.3/src
