@@ -1,0 +1,188 @@
+terastream {
+    global {
+        iana-prefix 2003:1800::/21;
+        terastream-ip-schema {
+            iana-prefix-length  21;
+            mv-bits-length      2;
+            r-bit-length        1;
+            r1-length           13;
+            port-length         5;
+            vlan-length         8;
+            user-network-length 8;
+            r2-id-length        5;
+            dc-service-length   1;
+            fdc-server-offset   0x100;
+        }
+        video-unicast 2003:1c20::/30;
+        voice-unicast 2003:1c30::/30;
+        bgp {
+            ipv4-regional-aggregate 80.159.224.0/19;
+            ipv4-our-aggregates 70.1.224.0/19;
+            ipv6-our-aggregates 2001:1800::/21;
+        }
+        management {
+            prefixes {
+                prefix 2003:1800:ffe::/64;
+            }
+        }
+        snmp {
+            server 2003:1b3b:ffe2:11::2;
+            server 2001:db8::2;
+        }
+        syslog {
+            server 2001:db8::1;
+            server 2001:db8::2;
+        }
+        region-id 276;
+    }
+    r1-settings {
+        signup-tunnel-neighbor 2003:1b2b:fffa:ffff::fcb0;
+    }
+}
+
+terastream {
+    global {
+        bgp {
+            autonomous-system 2792;
+            authentication {
+                authentication-key "abcdef";
+            }
+        }
+        management {
+            initial-credentials {
+                username vrnetlab;
+                password VR-netlab9;
+            }
+            management-credentials {
+                password Global-management1;
+            }
+        }
+        isis {
+            authentication {
+                mode               send-only;
+                authentication-key "abcdef";
+            }
+            mode L1L2;
+        }
+        snmp {
+            usm-password secretsecret;
+            usm-privacy-password secretsecret;
+        }
+    }
+    state-poller {
+        disabled;
+    }
+    configuration-consistency-guarantor {
+        devices {
+            enabled;
+            polling-period 60;
+        }
+        services {
+            enabled;
+            polling-period 60;
+        }
+    }
+}
+
+services {
+    global-settings {
+        collect-forward-diff true;
+    }
+}
+
+devices {
+    authgroups {
+        group netsim {
+            default-map {
+                remote-name admin;
+                remote-password admin;
+            }
+        }
+        group vrnetlab {
+            default-map {
+                remote-name vrnetlab;
+                remote-password VR-netlab9;
+            }
+        }
+        snmp-group RTNSM {
+            default-map {
+                usm {
+                    remote-name    RTNSM;
+                    security-level auth-priv;
+                    auth {
+                        md5 {
+                            remote-password secretsecret;
+                        }
+                    }
+                    priv {
+                        aes {
+                            remote-password secretsecret;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    global-settings {
+        connect-timeout 60;
+        read-timeout 120;
+        write-timeout 60;
+        trace raw;
+        ned-settings {
+            alu-sr {
+                trans-id-method rollback-timestamp;
+                meta-data {
+                    re-enter-authentication-key disabled;
+                }
+            }
+        }
+        trace-dir /ncs/log/traces;
+    }
+}
+
+java-vm {
+    java-logging {
+        logger com.example.terastream {
+            level level-debug;
+        }
+    }
+}
+python-vm {
+    logging {
+        log-file-prefix /ncs/log/ncs-python-vm;
+        level           level-debug;
+    }
+}
+aaa {
+    authentication {
+        users {
+            user ci {
+                uid 1000;
+                gid 1000;
+                password ci;
+                ssh_keydir /ncs/users/ci/.ssh;
+                homedir /ncs/users/ci;
+                public-keys {
+                    public-key kll@ci-phy-worker-1 {
+                        ssh-key AAAAB3NzaC1yc2EAAAADAQABAAACAQCfdL89IcSZmk15yPWxdiCgBWGAyHNB9KtuJjxOIdRvkVCAR7vNGgjM9e/z+k2XcHSks008ZcA1P77BBm3cVQXYCrRCKfBafUCAfJpv7OYKBb96SMy3mAP/lxuQnQmTWzGzwuF8Hlx4hM825jJg7W6akYhNW4Ksf8G+bu2lk+D2AjsIhDTTB2AK3yqLwMIr5/6EL0t8a5zIYgjrvUl49LK3i+p1UxJnCRhwBWdb0pgXpFBjmcHk9ShI2qSzm1Kgzh/ZBQes2x2jWsHWl8SLma9j5LLiGwi95mNT/eo/LtcdNZjuCgcmhEHDskuCzq/OSEr/s2efGswAIk6jrIBgureqY5+CQkw9RO+5yB24ddQIr+u6kZSywjYzuIruC8AQWbUmRRAvXk0oU4qLZ7DME883vOiTDzAYU2KWtXXhpaL8CDOmskTSxUmwgujX+S/w3Rw4ya+fwb+TNfV36iMt/98/a7Pv46A+g4aXAFf729olZ5jptFds7PrUL5zrkmf+fBjXONJYBencLsvzYR8SX6thlz5/c/ugWr2DQ3WfxrpIVujdNdJNY6wWooW8itwJIJWz5tf+wot2WJqEPSxmjCdq4AbvKeOy2PjrKc6qwsqmcSpxGkjxKdjDok4nSCMxK5YHahfRIG0SIylVyZOeyrh4i0kLPDJMZbgockIK4JTE6Q==;
+                    }
+                }
+            }
+            user ncs2tsdb {
+                uid 1000;
+                gid 1000;
+                password ncs2tsdb;
+                ssh_keydir /var/ncs/homes/ncs2tsdb/.ssh;
+                homedir /var/ncs/homes/ncs2tsdb;
+            }
+        }
+    }
+}
+nacm {
+    groups {
+        group admin {
+            user-name [ admin private signup-portal tsrun ncs2tsdb ci ];
+        }
+    }
+}
+
