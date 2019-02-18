@@ -1,0 +1,21 @@
+infrastructure {
+    aftr-cluster ci-aftr-cluster {
+        endpoint-address 2001:db8:af::1;
+        ipv4-address-pool {
+            range 192.168.123.0 192.168.123.100;
+        }
+    }
+
+    dhcp-profile ci-test-profile {
+        service internet_video_voice {
+            service-name      terastream_3play;
+            dhcp-interface-id DTAG.4.._ANYIPTVVOIP;
+        }
+    }
+
+    dhcp-server-group ci-rfc7597-dhcp-group {
+        dhcp-proxy-address [ 2001:db8::d8c:1 ];
+    }
+
+}
+
