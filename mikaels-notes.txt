@@ -1,0 +1,309 @@
+Here are my notes so far…
+
+
+edit /etc/default/grub
+GRUB_CMDLINE_LINUX_DEFAULT="intel_iommu=on default_hugepagesz=1G hugepagesz=1G hugepages=12 isolcpus=2,3,6,7"
+update-grub
+
+apt-get install bridge-utils qemu-kvm libvirt-bin python python-netifaces vnc4server libyaml-dev python-yaml numactl libparted0-dev libpciaccess-dev libnuma-dev libyajl-dev libxml2-dev libglib2.0-dev libnl-3-dev python-pip python-dev libxml2-dev libxslt-dev docker
+
+reboot
+
+dtadmin@bn831-bbf-lab:~$ tar xf vmx-bundle-18.4R1.8.tar
+dtadmin@bn831-bbf-lab:~$ cd vmx/
+
+edit config/vmx.conf
+    host-management-interface : eno2        ##change this to match
+    routing-engine-image      : "/home/dtadmin/vmx/images/junos-vmx-x86-64-18.4R1.8.qcow2"
+    routing-engine-hdd        : "/home/dtadmin/vmx/images/vmxhdd.img"
+    forwarding-engine-image   : "/home/dtadmin/vmx/images/vFPC-20181130.img"
+…
+FORWARDING_PLANE:
+    memory-mb   : 8192
+    vcpus       : 3
+    console_port: 8602
+    device-type : virtio
+…
+#Interfaces
+JUNOS_DEVICES:
+   - interface            : ge-0/0/0
+     mac-address          : "02:06:0A:0E:FF:F0"
+     description          : "ge-0/0/0 interface"
+     type                 : virtio
+  
+   - interface            : ge-0/0/1
+     mac-address          : "02:06:0A:0E:FF:F1"
+     description          : "ge-0/0/1 interface"
+     type                 : virtio
+  
+   - interface            : ge-0/0/2
+     mac-address          : "02:06:0A:0E:FF:F2"
+     description          : "ge-0/0/2 interface"
+     type                 : virtio
+  
+   - interface            : ge-0/0/3
+     mac-address          : "02:06:0A:0E:FF:F3"
+     description          : "ge-0/0/3 interface"
+     type                 : virtio
+
+   - interface            : ge-0/0/4
+     mac-address          : "02:06:0A:0E:FF:F4"
+     description          : "ge-0/0/4 interface"
+     type                 : virtio
+  
+   - interface            : ge-0/0/5
+     mac-address          : "02:06:0A:0E:FF:F5"
+     description          : "ge-0/0/5 interface"
+     type                 : virtio
+
+edit config/vmx-junosdev.conf
+interfaces :
+
+     - link_name  : vmx_link1
+       mtu        : 1500
+       endpoint_1 :
+         - type        : junos_dev
+           vm_name     : vmx1
+           dev_name    : ge-0/0/0
+       endpoint_2 :
+         - type        : host_dev
+           dev_name    : eno7
+
+     - link_name  : vmx_link2
+       mtu        : 1500
+       endpoint_1 :
+         - type        : junos_dev
+           vm_name     : vmx1
+           dev_name    : ge-0/0/1
+       endpoint_2 :
+         - type        : host_dev
+           dev_name    : eno8
+
+     - link_name  : vmx_link3
+       endpoint_1 :
+         - type        : junos_dev
+           vm_name     : vmx1
+           dev_name    : ge-0/0/2
+       endpoint_2 :
+         - type        : host_dev
+           dev_name    : enp7s0f0
+
+     - link_name  : vmx_link4
+       endpoint_1 :
+         - type        : junos_dev
+           vm_name     : vmx1
+           dev_name    : ge-0/0/3
+       endpoint_2 :
+         - type        : host_dev
+           dev_name    : enp7s0f1
+
+     - link_name  : br-60fbd60fc207  # this is the docker bridge name we’ll create later
+       endpoint_1 :
+         - type        : junos_dev
+           vm_name     : vmx1
+           dev_name    : ge-0/0/4
+       endpoint_2 :
+         - type        : junos_dev
+           vm_name     : vmx2
+           dev_name    : ge-0/0/4
+
+dtadmin@bn831-bbf-lab:~/vmx$ sudo ./vmx.sh --install
+
+sudo ./vmx.sh —console vcp vmx1
+
+login with root and empty password
+run “cli”
+
+configure address towards ncs (this is the interface where the host is ::1 and NCS will be ::10)
+
+set interfaces ge-0/0/4 unit 0 family inet6 address  2003:1b3b:fffe:1::3/64
+set system root-authentication plain-text-password ### password prompt will follow
+set system services ssh root-login allow
+set system services netconf ssh
+delete chassis auto-image-upgrade
+set system login user vrnetlab class super-user
+set system login user vrnetlab authentication plain-text-password
+#enter password VR-netlab9
+commit
+
+#set up vmx threads on the correct cores (moves all to 2,3)
+
+dtadmin@bn831-bbf-lab:~$ sudo taskset -p -a -c 2,3 27683
+pid 27672's current affinity list: 0-7
+pid 27672's new affinity list: 2,3
+pid 27673's current affinity list: 0-7
+pid 27673's new affinity list: 2,3
+pid 27682's current affinity list: 0-7
+pid 27682's new affinity list: 2,3
+pid 27683's current affinity list: 0-7
+pid 27683's new affinity list: 2,3
+pid 27684's current affinity list: 0-7
+pid 27684's new affinity list: 2,3
+pid 27685's current affinity list: 0-7
+pid 27685's new affinity list: 2,3
+pid 27693's current affinity list: 0-7
+pid 27693's new affinity list: 2,3
+
+#now find the two threads that are busywait and put them on 6 and 7 respectively
+dtadmin@bn831-bbf-lab:~$ sudo taskset -p -c 6 6979
+pid 6979's current affinity list: 2,3
+pid 6979's new affinity list: 6
+dtadmin@bn831-bbf-lab:~$ sudo taskset -p -c 7 6978
+pid 6978's current affinity list: 2,3
+pid 6978's new affinity list: 7
+
+# after this the there should be two threads on 6-7 busywaiting, show these 100% in htop (cpu7-8)
+
+
+
+
+#create the docker network bridge that ncs, host and vmx will use for management
+sudo docker network create --ipv6 --subnet 2003:1b3b:fffe:1::/64 --ip-range 2003:1b3b:fffe:1::10/126 --gateway 2003:1b3b:fffe:1::1 ncs
+sudo docker pull gitlab.dev.terastrm.net:4567/terastream/nso-ts:latest
+sudo mkdir -p /data/ncs
+sudo docker run -itd --name ncs --network ncs --privileged -v /data/ncs:/ncs gitlab.dev.terastrm.net:4567/terastream/nso-ts:latest
+#get the files ncs-config-terastream and ncs-config-r1-access from github/bbf repo
+git clone https://github.com/iffy50/bbf
+cd bbf
+sudo docker cp ncs-config-terastream ncs:/
+sudo docker cp ncs-config-r1-access ncs:/
+
+#attach to the ncs docker container
+sudo docker exec -it ncs bash  
+#in the docker container now, add static route to the vmx R1
+ip -6 r a 2003::/19 via 2003:1b3b:fffe:1::3
+#attach to ncs
+ncs_cli -u admin
+#now in NCS, load merge the base config files
+configure
+load merge /ncs-config-terastream
+load merge /ncs-config-r1-access
+commit
+#add “terastream global home-gateway credentials rsa-public-key” and rsa-private-key (not included here because security
+
+#add r1:
+set infrastructure r1 5 device device-type juniper-junos
+set infrastructure r1 5 device management-endpoint 2003:1b3b:fffe:1::3
+set infrastructure r1 5 r1-access-config-settings dhcp-server-group ci-rfc7597-dhcp-group
+set infrastructure r1 5 r1-access-config-settings dhcp-profile ci-test-profile
+set infrastructure r1 5 r1-access-config-settings aftr-cluster ci-aftr-cluster
+commit
+#now NCS will setup the R1, verify with:
+show infrastructure r1
+#NAME      TYPE    STATE                STATUS   WHEN                 ref  ACTION  
+#-————————————————————————————————————————
+#self      self    init                 reached  2019-02-18T08:47:00  -    -      
+#                  ready                reached  2019-02-18T08:59:03  -    -      
+#276-R1-5  device  init                 reached  2019-02-18T08:47:00  -    -      
+#                 device-created       reached  2019-02-18T08:59:03  -    -      
+#                  base-config-created  reached  2019-02-18T08:59:03  -    -      
+#                  ready                reached  2019-02-18T08:59:03  -    -      
+
+#configure customer-facing port on R1:
+set infrastructure r1 5 port 0 physical-port ge-0/0/0
+set infrastructure r1 5 port 0 number-of-customers 10
+exit
+
+#put port 0 vlan 2001 customer in service-mode
+admin@ncs> request calc-ip device 276-R1-5 port 0 vlan 2001
+ip 2003:1c08:00a0:0100:0000:0000:0000:0000
+[ok][2019-02-18 09:03:35]
+configure
+request add-subscriber port-id 2003:1c08:00a0:0100:0000:0000:0000:0000
+commit
+
+#check that customer is now in service mode on the vMX with “show interfaces terse”
+#ge-0/0/0.2001           up    up   inet6    2003:1c08:a0:1ff::1/64
+#                                            fe80::206:a07:d10e:fff0/64
+#                                   multiservice
+
+#configure access switch in NCS:
+
+dmin@ncs% show infrastructure r1                    
+r1 5 {
+…
+    port 2 {
+        physical-port ge-0/0/2;
+        access-switch 0 {
+            type  juniper-ex4300-32f+ex-um-8x8sfp;
+            ports 40;
+            device {
+                device-type juniper-junos;
+                management-endpoint 2003:1a38:a2:2::2;
+                management-credentials {
+                    username initial;
+                    password $8$QlcdPY+tiaAMCJfRfuuB0xTtFN0O/mRNelrBMw902FI=;
+                }
+            }
+        }
+    }
+  
+
+
+After reboot start vmx with
+sudo ./vmx.sh —start     #might have to run this twice
+
+dtadmin@bn831-bbf-lab:~/vmx$ sudo docker rm ncs
+ncs
+dtadmin@bn831-bbf-lab:~/vmx$ sudo docker run -itd --name ncs --network ncs --privileged -v /data/ncs:/ncs gitlab.dev.terastrm.net:4567/terastream/nso-ts:latest
+ff426a8f0da35a4090f77bd2d04cded043c2058a010fdb0d4d58ce71f7c6083a
+
+#move the vmx management interface to the docker bridge:
+dtadmin@bn831-bbf-lab:~$ sudo brctl delif br-60fbd60fc207 ge-0.0.4-vmx1
+dtadmin@bn831-bbf-lab:~$ sudo brctl addif br-34d1de57c5f6 ge-0.0.4-vmx1
+
+
+#configure dhcp relay to use vm-host kea installation
+admin@ncs% set infrastructure dhcp-server-group ci-rfc7597-dhcp-group dhcp-proxy-address 2003:1b3b:fffe:1::1
+[ok][2019-02-18 11:54:50]
+
+#install kea
+https://kb.isc.org/docs/kea-build-on-ubuntu
+copy the kea-dhcp6.conf file to /usr/local/etc/kea
+change config so the correct bridge is used (the docker bridge that vmx ge0/0/4 and ncs docker image is connected to)
+
+Dhcp6": {
+    "interfaces-config": {
+        "interfaces": [ "br-34d1de57c5f6/2003:1b3b:fffe:1::1" ]
+    },
+
+#start kea
+dtadmin@bn831-bbf-lab:/usr/local/etc/kea$ sudo keactrl start
+INFO/keactrl: Starting /usr/local/sbin/kea-dhcp4 -c /usr/local/etc/kea/kea-dhcp4.conf
+INFO/keactrl: Starting /usr/local/sbin/kea-dhcp6 -c /usr/local/etc/kea/kea-dhcp6.conf
+INFO/keactrl: Starting /usr/local/sbin/kea-ctrl-agent -c /usr/local/etc/kea/kea-ctrl-agent.conf
+
+check that kea is started and listening to the correct interface:
+dtadmin@bn831-bbf-lab:/usr/local/etc/kea$ sudo ss -nlp | grep -i kea
+…
+udp    UNCONN     0      0       2003:1b3b:fffe:1::1:547                  :::*                   users:(("kea-dhcp6",pid=28870,fd=14))
+
+#add routing for the host OS so it can return dhcp packets to clients:
+sudo ip -6 r a 2003:1a38::/32 via 2003:1b3b:fffe:1::3
+sudo ip -6 r a 2003:1c08::/32 via 2003:1b3b:fffe:1::3
+
+#tcpdump on the bridge to verify forwardin
+dtadmin@bn831-bbf-lab:/usr/local/etc/kea$ sudo tcpdump -n -i br-34d1de57c5f6 port 546 or port 547
+tcpdump: verbose output suppressed, use -v or -vv for full protocol decode
+listening on br-34d1de57c5f6, link-type EN10MB (Ethernet), capture size 262144 bytes
+14:10:32.227961 IP6 2003:1a38:a0::1.547 > 2003:1b3b:fffe:1::1.547: dhcp6 relay-fwd
+14:11:06.812872 IP6 2003:1a38:a0::1.547 > 2003:1b3b:fffe:1::1.547: dhcp6 relay-fwd
+14:12:26.572753 IP6 2003:1a38:a0::1.547 > 2003:1b3b:fffe:1::1.547: dhcp6 relay-fwd
+14:12:26.573616 IP6 2003:1b3b:fffe:1::1.547 > 2003:1a38:a0::1.547: dhcp6 relay-reply
+14:12:27.569773 IP6 2003:1a38:a0::1.547 > 2003:1b3b:fffe:1::1.547: dhcp6 relay-fwd
+14:12:27.570518 IP6 2003:1b3b:fffe:1::1.547 > 2003:1a38:a0::1.547: dhcp6 relay-reply
+
+#verify dhcpv6 relay bindings on vMX
+root@276-R1-5> show dhcpv6 relay binding
+Prefix                  Session Id  Expires  State    Interface    Client DUID
+2003:1c08:a0:1e0::/60   50          3938     BOUND    ge-0/0/2.2001 LL0x1-00:22:07:6f:f0:66          
+2003:1c08:a0:1d0::/60   50          3938     BOUND    ge-0/0/2.2001 LL0x1-00:22:07:6f:f0:66          
+2003:1c08:a0:1c0::/60   50          3938     BOUND    ge-0/0/2.2001 LL0x1-00:22:07:6f:f0:66          
+2003:1c08:a0:110::/60   51          3980     BOUND    ge-0/0/2.2002 LL0x1-00:22:07:6f:ff:ae          
+2003:1c08:a0:100::/60   51          3980     BOUND    ge-0/0/2.2002 LL0x1-00:22:07:6f:ff:ae          
+2003:1c08:a0:1f0::/60   51          3980     BOUND    ge-0/0/2.2002 LL0x1-00:22:07:6f:ff:ae          
+
+#install and start iperf3 on server
+sudo apt-get install iperf iperf3
+iperf3 -s
+
